@@ -306,6 +306,10 @@ port_init(uint16_t port_id)
 	doca_error_t stat = doca_flow_port_start(&port_flows, &port);
 	if (port == NULL) {
 		DOCA_LOG_ERR("failed to initialize doca flow port: %s", doca_get_error_string(stat));
+		if (stat == DOCA_ERROR_UNKNOWN) {
+			DOCA_LOG_ERR("(Check PF/VF trust is enabled if you see an error such as '%s')",
+				"Cannot create HWS action since HWS is not supported");
+		}
 		return NULL;
 	}
 	return port;
@@ -326,7 +330,6 @@ flow_init(struct hairpin_mesh_app_config *app_config)
 		DOCA_LOG_ERR("failed to init doca: %s", doca_get_error_string(stat));
 		return stat;
 	}
-	DOCA_LOG_DBG("DOCA flow init done");
 
 	app_config->port_flows = rte_zmalloc("per_port_cfg",
 		sizeof(struct per_port_config) * dpdk_config->port_config.nb_ports,
@@ -341,17 +344,8 @@ flow_init(struct hairpin_mesh_app_config *app_config)
 	}
 	DOCA_LOG_DBG("DOCA ports init done");
 
-#if 0
-	// TODO: delete this after ensuring it's not needed
-	/* pair the two ports together for hairpin forwarding */
-	for (uint16_t port_id = 0; port_id + 1 < dpdk_config->port_config.nb_ports; port_id += 2) {	
-		stat = doca_flow_port_pair(ports[port_id], ports[port_id + 1]);
-		if (stat != DOCA_SUCCESS) {
-			DOCA_LOG_ERR("DOCA Flow port pairing failed");
-			return -1;
-		}
-	}
-#endif
+	// note there is no need to port_pair because we are not creating
+	// flows with DOCA_FLOW_FWD_PORT
 
 	DOCA_LOG_DBG("DOCA flow init done");
 	return 0;
@@ -520,17 +514,14 @@ pipes_init(struct hairpin_mesh_app_config *app_config)
 }
 
 void
-flow_destroy(uint16_t num_ports)
+flow_destroy(struct hairpin_mesh_app_config *app_config)
 {
-	struct rte_flow_error error = {};
-	for (uint16_t port_id = 0; port_id < num_ports; port_id++)
+	for (uint16_t port_id = 0; port_id < app_config->dpdk_config.port_config.nb_ports; port_id++)
 	{
-		// TODO: doca_flow_port_pipes_flush
-		// TODO: doca_flow_port_stop
-		rte_flow_flush(port_id, &error);
-		rte_eth_dev_stop(port_id);
-		rte_eth_dev_close(port_id);
+		doca_flow_port_pipes_flush(app_config->port_flows[port_id].doca_port);
+		doca_flow_port_stop(app_config->port_flows[port_id].doca_port);
 	}
+	doca_flow_destroy();
 }
 
 int
@@ -590,7 +581,7 @@ main(int argc, char **argv)
 		rte_eal_wait_lcore(lcore_id);
 	}
 	
-	flow_destroy(app_config.dpdk_config.port_config.nb_ports);
+	flow_destroy(&app_config);
 	doca_argp_destroy();
 
 	return 0;
