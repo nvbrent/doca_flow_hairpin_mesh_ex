@@ -10,10 +10,12 @@
             "request": "launch",
             "type": "cppdbg",
             "args": [
-                "-a17:00.0,dv_flow_en=2",
+                "-a17:00.3,dv_flow_en=2",
+                "-a17:00.5,dv_flow_en=2",
+                "-a17:00.7,dv_flow_en=2",
                 "-c0xf",
                 "--",
-                "-l", "60"
+                "-l", "50"
             ],
             "cwd": "${workspaceFolder}"
         }
