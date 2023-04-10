@@ -261,9 +261,13 @@ apply_session_flow(
 	match_l4_port->dst_port = session->dst_port;
 	action_l4_port->src_port = session->snat_src_port;
 
-	memcpy(actions[0].outer.eth.dst_mac, 
+	rte_eth_macaddr_get(
+		session->ingress_port, 
+		(struct rte_ether_addr *)&actions[0].outer.eth.src_mac);
+	
+	rte_ether_unformat_addr(
 		port_mac_addr[session->egress_port], 
-		DOCA_ETHER_ADDR_LEN);
+		(struct rte_ether_addr *)actions[0].outer.eth.dst_mac);
 
 	uint16_t rss_queues[] = {
 		dpdk_config->port_config.nb_ports + session->egress_port,
@@ -471,6 +475,7 @@ create_session_pipe(
 	struct doca_flow_actions actions = {
 		.outer = {
 			.eth = {
+				.src_mac = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff },
 				.dst_mac = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff },
 				.type = DOCA_FLOW_ACTION_AUTO,
 			},
