@@ -233,7 +233,6 @@ apply_session_flow(
 	struct doca_flow_match match = {
 		.outer = {
 			.l3_type = DOCA_FLOW_L3_TYPE_IP4,
-			.l4_type_ext = (session->proto == IPPROTO_UDP) ? DOCA_FLOW_L4_TYPE_EXT_UDP : DOCA_FLOW_L4_TYPE_EXT_TCP,
 			.ip4 = {
 				.src_ip = session->src_ip,
 				.dst_ip = session->dst_ip,
@@ -244,22 +243,27 @@ apply_session_flow(
 
 	struct doca_flow_actions actions[] = {
 		[0] = {
+			.outer.l3_type = DOCA_FLOW_L3_TYPE_IP4,
 			.outer.ip4.src_ip = session->snat_src_ip,
 			// TCP/UDP port action set below
 		}
 	};
 
-	struct doca_flow_header_l4_port *match_l4_port = session->proto == IPPROTO_UDP ?
-		&match.outer.udp.l4_port : 
-		&match.outer.tcp.l4_port;
+	if (session->proto == IPPROTO_UDP) {
+		match.outer.l4_type_ext = DOCA_FLOW_L4_TYPE_EXT_UDP;
+		match.outer.udp.l4_port.src_port = session->src_port;
+		match.outer.udp.l4_port.dst_port = session->dst_port;
 
-	struct doca_flow_header_l4_port *action_l4_port = session->proto == IPPROTO_UDP ?
-		&actions[0].outer.udp.l4_port : 
-		&actions[0].outer.tcp.l4_port;
-
-	match_l4_port->src_port = session->src_port;
-	match_l4_port->dst_port = session->dst_port;
-	action_l4_port->src_port = session->snat_src_port;
+		actions[0].outer.l4_type_ext = DOCA_FLOW_L4_TYPE_EXT_UDP;
+		actions[0].outer.udp.l4_port.src_port = session->snat_src_port;
+	} else {
+		match.outer.l4_type_ext = DOCA_FLOW_L4_TYPE_EXT_TCP;
+		match.outer.tcp.l4_port.src_port = session->src_port;
+		match.outer.tcp.l4_port.dst_port = session->dst_port;
+		
+		actions[0].outer.l4_type_ext = DOCA_FLOW_L4_TYPE_EXT_TCP;
+		actions[0].outer.tcp.l4_port.src_port = session->snat_src_port;
+	}
 
 	rte_eth_macaddr_get(
 		session->ingress_port, 
@@ -456,16 +460,6 @@ create_session_pipe(
 			},
 		},
 	};
-	if (proto == IPPROTO_UDP) {
-		match.outer.l4_type_ext = DOCA_FLOW_L4_TYPE_EXT_UDP;
-		match.outer.udp.l4_port.src_port = UINT16_MAX;
-		match.outer.udp.l4_port.dst_port = UINT16_MAX;
-	} else {
-		match.outer.l4_type_ext = DOCA_FLOW_L4_TYPE_EXT_TCP;
-		match.outer.tcp.l4_port.src_port = UINT16_MAX;
-		match.outer.tcp.l4_port.dst_port = UINT16_MAX;
-	}
-
 	struct doca_flow_monitor mon = {
 		// .flags = DOCA_FLOW_MONITOR_COUNT | DOCA_FLOW_MONITOR_AGING,
 		// .aging = 5, // age timeout in seconds
@@ -477,11 +471,31 @@ create_session_pipe(
 			.eth = {
 				.src_mac = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff },
 				.dst_mac = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff },
-				.type = DOCA_FLOW_ACTION_AUTO,
 			},
+			.l3_type = DOCA_FLOW_L3_TYPE_IP4,
+			.ip4 = {
+				.src_ip = UINT32_MAX,
+			}
 		},
 	};
+
 	struct doca_flow_actions *actions_arr[] = { &actions };
+
+	if (proto == IPPROTO_UDP) {
+		match.outer.l4_type_ext = DOCA_FLOW_L4_TYPE_EXT_UDP;
+		match.outer.udp.l4_port.src_port = UINT16_MAX;
+		match.outer.udp.l4_port.dst_port = UINT16_MAX;
+
+		actions.outer.l4_type_ext = DOCA_FLOW_L4_TYPE_EXT_UDP;
+		actions.outer.udp.l4_port.src_port = UINT16_MAX;
+	} else {
+		match.outer.l4_type_ext = DOCA_FLOW_L4_TYPE_EXT_TCP;
+		match.outer.tcp.l4_port.src_port = UINT16_MAX;
+		match.outer.tcp.l4_port.dst_port = UINT16_MAX;
+		
+		actions.outer.l4_type_ext = DOCA_FLOW_L4_TYPE_EXT_TCP;
+		actions.outer.tcp.l4_port.src_port = UINT16_MAX;
+	}
 
 	struct doca_flow_pipe_cfg cfg = {
 		.attr = {
