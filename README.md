@@ -59,7 +59,31 @@ EAL: VFIO support initialized
 ```
 Use `CTRL-C` to exit.
 
-## Enabling Trust (DPU Mode only)
+## Enabling Trust - NIC Mode
+
+Substitute `enp23s0f0np0` etc. as required.
+
+Tear down existing VFs:
+```
+echo 0 > /sys/class/net/enp23s0f0np0/device/sriov_numvfs
+echo 0 > /sys/class/net/enp23s0f1np1/device/sriov_numvfs
+```
+
+Enable VF trust in the Firmware:
+```
+mst start
+mlxreg -d /dev/mst/mt41686_pciconf0 --reg_name VHCA_TRUST_LEVEL --yes --indexes "vhca_id=0x0,all_vhca=0x1" --set "trust_level=0x1"
+```
+
+Re-create the VFs:
+```
+echo 4 > /sys/class/net/enp23s0f0np0/device/sriov_numvfs
+echo 4 > /sys/class/net/enp23s0f1np1/device/sriov_numvfs
+```
+
+Note that driver-level trust mode is not typically required for DOCA flow. (I.e. `ip link set enp23s0f0np0 vf 0 trust on`)
+
+## Enabling Trust - DPU/Embedded Mode
 
 On the Host, create the VFs as shown above. Then perform the following steps.
 
