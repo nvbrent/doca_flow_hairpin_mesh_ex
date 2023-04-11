@@ -350,10 +350,11 @@ inject_sample_sessions(
 // Parsing args with argp
 
 static doca_error_t
-argp_isolated_mode_callback(void *config_voidp, void *param)
+argp_isolated_mode_callback(void *param, void *config_voidp)
 {
 	struct hairpin_mesh_app_config *app_config = config_voidp;
-	app_config->dpdk_config.port_config.isolated_mode = *(bool *)param;
+	app_config->dpdk_config.port_config.isolated_mode = *(bool*)param;
+	DOCA_LOG_INFO("Selected flow isolation mode");
 	return DOCA_SUCCESS;
 }
 
