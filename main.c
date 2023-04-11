@@ -206,22 +206,6 @@ sample_lcore_func(void *lcore_args)
 ////////////////////////////////////////////////////////////////////////////////
 // Store data in rte_hash
 
-#if 0
-void
-sample_hash_ops(void)
-{
-	struct session_entry * entry = rte_zmalloc("sessions", sizeof(struct session_entry), RTE_CACHE_LINE_SIZE);
-	entry->key = 0x1234567890ull;
-	entry->proto = IPPROTO_UDP;
-	entry->src_ip = RTE_BE32(0x01020304);
-	entry->dst_ip = RTE_BE32(0x05060708);
-	entry->src_port = RTE_BE16(1111);
-	entry->dst_port = RTE_BE16(2222);
-
-	rte_hash_add_key_data(ht, &entry->key, entry);
-}
-#endif
-
 doca_error_t
 apply_session_flow(
 	struct hairpin_mesh_app_config *app_config, 
